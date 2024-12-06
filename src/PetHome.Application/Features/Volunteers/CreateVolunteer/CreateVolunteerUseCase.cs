@@ -19,7 +19,7 @@ public class CreateVolunteerUseCase
         _logger = logger;
     }
 
-    public async Task<Result<Guid, Error>> Execute(
+    public async Task<Guid> Execute(
         CreateVolunteerRequest request,
         CancellationToken ct)
     {
@@ -65,7 +65,7 @@ public class CreateVolunteerUseCase
             requisitesDetails)
             .Value;
 
-        var result = await _volunteerRepository.Add(volunteer);
+        var result = await _volunteerRepository.Add(volunteer, ct);
 
         _logger.LogInformation("Волонетёр с id={0} был создан", volunteer.Id.Value);
 

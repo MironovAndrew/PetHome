@@ -1,5 +1,7 @@
-﻿using PetHome.Domain.PetManagment.GeneralValueObjects;
+﻿using CSharpFunctionalExtensions;
+using PetHome.Domain.PetManagment.GeneralValueObjects;
 using PetHome.Domain.PetManagment.VolunteerEntity;
+using PetHome.Domain.Shared.Error;
 
 namespace PetHome.Application.Features.Volunteers;
 
@@ -7,16 +9,22 @@ namespace PetHome.Application.Features.Volunteers;
 public interface IVolunteerRepository
 {
     //Создание волонтёра
-    public Task<Guid> Add(Volunteer volunteer, CancellationToken ct = default);
+    public Task<Guid> Add(Volunteer volunteer, CancellationToken ct);
     //Создание волонтёра
-    public Task<Guid> Update(Volunteer volunteer, CancellationToken ct = default);
+    public Task<Guid> Update(Volunteer volunteer, CancellationToken ct);
 
     //Найти волонтера по ID
-    public Task<Volunteer> GetById(Guid id, CancellationToken ct = default);
+    public Task<Result<Volunteer, Error>> GetById(Guid id, CancellationToken ct);
 
     //Удаление волонтера
-    public Task<Guid> Remove(Volunteer volunteer, CancellationToken ct = default);
+    public Task<Guid> Remove(Volunteer volunteer, CancellationToken ct);
 
     //Удаление волонтера по id
-    public Task<bool> RemoveById(Guid id, CancellationToken ct = default);
+    public Task<bool> RemoveById(VolunteerId id, CancellationToken ct);
+
+    //Удалить коллекцию
+    public void Remove(IEnumerable<Volunteer> volunteers);
+
+    //Получить список Волонётров у кого параметр isDeleted == true
+    public IReadOnlyList<Volunteer> GetDeleted(CancellationToken ct);
 }

@@ -4,8 +4,13 @@ using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using PetHome.API.Extentions;
 using PetHome.API.Response;
+using PetHome.Application.Features.Background;
 using PetHome.Application.Features.Volunteers.CreateVolunteer;
+using PetHome.Application.Features.Volunteers.HardDeleteVolunteer;
+using PetHome.Application.Features.Volunteers.SoftDeleteRestoreVolunteer;
+using PetHome.Application.Features.Volunteers.SoftDeleteVolunteer;
 using PetHome.Application.Features.Volunteers.UpdateMainInfoVolunteer;
+using PetHome.Domain.PetManagment.VolunteerEntity;
 using PetHome.Domain.Shared.Error;
 
 namespace PetHome.API.Controllers;
@@ -27,6 +32,7 @@ public class VolunteerController : ParentController
         return Ok(ResponseEnvelope.Ok(result.Value));
     }
 
+
     [HttpPatch("{id:guid}/main-info")]
     public async Task<IActionResult> Update(
         [FromRoute] Guid id,
@@ -44,6 +50,67 @@ public class VolunteerController : ParentController
         Result<Guid, Error> result = await updateMainInfoUseCase.Execute(request, ct);
         if (result.IsFailure)
             return result.Error.GetSatusCode();
+
+        return Ok(ResponseEnvelope.Ok(result.Value));
+    }
+
+
+    [HttpDelete("hard/{id:guid}")]
+    public async Task<IActionResult> HardDelete(
+         [FromRoute] Guid id,
+         [FromServices] HardDeleteVolunteerUseCase hardDeleteUseCase,
+         CancellationToken ct)
+    {
+        VolunteerId volunteerId = VolunteerId.Create(id);
+
+        var result = await hardDeleteUseCase.Execute(volunteerId, ct);
+        if (result.IsFailure)
+            result.Error.GetSatusCode();
+
+        return Ok(ResponseEnvelope.Ok(result.Value));
+    }
+
+
+    [HttpPatch("soft/{id:guid}")]
+    public async Task<IActionResult> SoftDelete(
+        [FromRoute] Guid id,
+        [FromServices] SoftDeleteVolunteerUseCase softDeleteVoUseCase,
+        CancellationToken ct = default)
+    {
+        VolunteerId volunteerId = VolunteerId.Create(id);
+
+        var result = await softDeleteVoUseCase.Execute(id, ct);
+        if (result.IsFailure)
+            result.Error.GetSatusCode();
+
+        return Ok(ResponseEnvelope.Ok(result.Value));
+    }
+
+
+    [HttpPatch("soft-re/{id:guid}")]
+    public async Task<IActionResult> SoftRestore(
+        [FromRoute] Guid id,
+        [FromServices] SoftRestoreVolunteerUseCase softRestoreUseCase,
+        CancellationToken ct = default)
+    {
+        VolunteerId volunteerId = VolunteerId.Create(id);
+
+        var result = await softRestoreUseCase.Execute(id, ct);
+        if (result.IsFailure)
+            result.Error.GetSatusCode();
+
+        return Ok(ResponseEnvelope.Ok(result.Value));
+    }
+
+
+    [HttpDelete("backround")]
+    public async Task<IActionResult> HardDeleteSoftDeleted(
+        [FromServices] SoftDeletedEntitiesToHardDeleteUseCase useCase,
+        CancellationToken ct = default)
+    {
+        var result = await useCase.Execute(ct);
+        if (result.IsFailure)
+            result.Error.GetSatusCode();
 
         return Ok(ResponseEnvelope.Ok(result.Value));
     }

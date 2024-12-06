@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using PetHome.Application.Features.Volunteers;
 using PetHome.Domain.PetManagment.VolunteerEntity;
+using PetHome.Domain.Shared.Error;
 
 namespace PetHome.Infrastructure.DataBase.Repositories;
 public class VolunteerRepository : IVolunteerRepository
@@ -24,18 +25,20 @@ public class VolunteerRepository : IVolunteerRepository
     //Изменение волонтёра
     public async Task<Guid> Update(Volunteer volunteer, CancellationToken ct = default)
     {
-        _dBContext.Volunteers.Attach(volunteer); 
+        _dBContext.Volunteers.Attach(volunteer);
         await _dBContext.SaveChangesAsync(ct);
         return volunteer.Id;
     }
 
     //Найти волонтера по ID
-    public async Task<Volunteer> GetById(Guid id, CancellationToken ct = default)
+    public async Task<Result<Volunteer, Error>> GetById(Guid id, CancellationToken ct = default)
     {
         var volunteer = await _dBContext.Volunteers
             .Where(v => v.Id == id)
             .Include(x => x.Pets)
             .FirstOrDefaultAsync(ct);
+        if (volunteer == null)
+            return Errors.NotFound($"Волонтёр с id = {id}");
 
         return volunteer;
     }
@@ -50,14 +53,24 @@ public class VolunteerRepository : IVolunteerRepository
     }
 
     //Удаление волонтера по id
-    public async Task<bool> RemoveById(Guid id, CancellationToken ct = default)
+    public async Task<bool> RemoveById(VolunteerId id, CancellationToken ct = default)
     {
-        Volunteer volunteer = GetById(id).Result;
-
-        if (volunteer == null)
-            return false;
-
+        Volunteer volunteer = GetById(id, ct).Result.Value;
         await Remove(volunteer, ct);
         return true;
+    }
+
+    //Удалить коллекцию 
+    public void Remove(IEnumerable<Volunteer> volunteers)
+    {
+        _dBContext.RemoveRange(volunteers);
+        _dBContext.SaveChanges();
+    }
+
+    public IReadOnlyList<Volunteer> GetDeleted(CancellationToken ct)
+    {
+        return _dBContext.Volunteers
+            .Where(x => x._isDeleted == true)
+            .ToList();
     }
 }
