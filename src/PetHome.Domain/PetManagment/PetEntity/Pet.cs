@@ -3,10 +3,13 @@ using PetHome.Domain.PetManagment.GeneralValueObjects;
 using PetHome.Domain.PetManagment.VolunteerEntity;
 using PetHome.Domain.Shared.Error;
 using PetHome.Domain.Shared.Interfaces;
+using System.Security.Cryptography.X509Certificates;
 
 namespace PetHome.Domain.PetManagment.PetEntity;
 public class Pet : SoftDeletableEntity
 {
+    public static List<Pet> Pets { get; private set; } = new List<Pet>();
+
     private Pet() { }
 
     private Pet(
@@ -56,7 +59,7 @@ public class Pet : SoftDeletableEntity
     public RequisitesDetails? RequisitesDetails { get; private set; }
     public Date ProfileCreateDate { get; private set; }
     public VolunteerId VolunteerId { get; private set; }
-    // private bool _isDeleted = false;
+    public SerialNumber SerialNumber { get; private set; }
 
     public static Result<Pet, Error> Create(
         PetId id,
@@ -74,11 +77,10 @@ public class Pet : SoftDeletableEntity
         RequisitesDetails requisitesDetails,
         Date profileCreateDate)
     {
-
         if (weight > 500 || weight <= 0)
             return Errors.Validation("Вес");
 
-        return new Pet(
+        Pet pet = new Pet(
             id,
             name,
             speciesId,
@@ -92,10 +94,44 @@ public class Pet : SoftDeletableEntity
             isVaccinated,
             status,
             requisitesDetails,
-            profileCreateDate)
-        { };
+            profileCreateDate);
+
+        pet.InitSerialNumer();
+        Pets.Add(pet);
+        return pet;
     }
-     
+
     public override void SoftDelete() => base.SoftDelete();
     public override void SoftRestore() => base.SoftRestore();
+
+    // Присвоить serial number = max + 1
+    public void InitSerialNumer()
+    {
+        SerialNumber serialNumber = Pets.Count == 0
+            ? SerialNumber.Create(1)
+            : SerialNumber.Create(Pets.Select(x => x.SerialNumber.Value).Max() + 1);
+
+        SerialNumber = serialNumber;
+    }
+
+    //Изменить serial number
+    public void ChangeSerialNumber(int number)
+    {
+
+        Pets.Where(p =>
+                p.SerialNumber.Value >= number
+                && p.SerialNumber.Value < SerialNumber.Value)
+            .ToList()
+            .ForEach(s => s.SerialNumber = SerialNumber.Create(s.SerialNumber.Value + 1));
+
+        SerialNumber = SerialNumber.Create(number);
+
+        Pets = Pets.OrderBy(x => x.SerialNumber.Value).ToList();
+    }
+
+    // Присвоить serial number =  1
+    public void ChangeSerialNumberToBegining()
+    {
+        ChangeSerialNumber(1);
+    }
 }
