@@ -1,9 +1,10 @@
-﻿using PetHome.Domain.PetManagment.GeneralValueObjects;
+﻿using CSharpFunctionalExtensions;
+using Microsoft.Extensions.Logging;
+using PetHome.API.Response;
+using PetHome.Domain.PetManagment.GeneralValueObjects;
 using PetHome.Domain.PetManagment.PetEntity;
-using System.Drawing;
-using System.Xml.Linq;
+using PetHome.Domain.PetManagment.VolunteerEntity;
 using Xunit;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 using Color = PetHome.Domain.PetManagment.PetEntity.Color;
 
 namespace PetHome.UnitTests.DomainTests;
@@ -13,30 +14,33 @@ public class PetSerialNumberTest
     [Fact]
     public void Execute()
     {
-        int petsCount = 20;
+        int petCount = 20;
 
-        for (int i = 0; i < petsCount; i++)
+        for (int i = 0; i < petCount; i++)
         {
+            RequisitesDetails requisitesDetails =
+                RequisitesDetails.Create(new List<Requisites>() { Requisites.Create("name", "desc", PaymentMethodEnum.Cash).Value }).Value;
+
             Pet pet = Pet.Create(
-                PetId.Create(),
                 PetName.Create(i.ToString()).Value,
                 SpeciesId.Create().Value,
                 Description.Create("Описание").Value,
-                BreedId.Create(),
+                BreedId.Create().Value,
                 Color.Create("Чёрный").Value,
-                PetShelterId.Create(),
+                PetShelterId.Create().Value,
                 23,
                 false,
-                Domain.PetManagment.GeneralValueObjects.Date.Create(DateOnly.Parse("10.10.2024")).Value,
+                Domain.PetManagment.GeneralValueObjects.Date.Create(DateTime.Parse("10.10.2024")).Value,
                 false,
                 PetStatusEnum.isHomed,
-                RequisitesDetails.Create(new List<Requisites>() { Requisites.Create("name", "desc", PaymentMethodEnum.Cash).Value }).Value,
-                Domain.PetManagment.GeneralValueObjects.Date.Create(DateOnly.Parse("10.10.2024")).Value).Value;
+                VolunteerId.CreateEmpty().Value,
+                requisitesDetails)
+                .Value;
         }
 
         //Проверка инициализации и уникальности serial number
-        Assert.Equal(GetUniqueSerialNumbersCount(), petsCount);
-        CheckOrderAssert(petsCount);
+        Assert.Equal(GetUniqueSerialNumbersCount(), petCount);
+        CheckOrderAssert(petCount);
 
 
         //Проверка переноса serial number вначало, уникальности всех номеров и их порядок
@@ -45,21 +49,35 @@ public class PetSerialNumberTest
         Pet.Pets[numToCheck].ChangeSerialNumberToBegining();
         string nameWithNewSerialNumber = Pet.Pets[0].Name.Value;
 
-        Assert.Equal(GetUniqueSerialNumbersCount(), petsCount);
-        CheckOrderAssert(petsCount);
+        Assert.Equal(GetUniqueSerialNumbersCount(), petCount);
+        CheckOrderAssert(petCount);
         Assert.Equal(nameWithOldSerialNumber, nameWithNewSerialNumber);
 
 
-        //Проверка переноса serial number на n-ую позицию, уникальности всех номеров и их порядок
+        //Проверка переноса serial number НА УБЫВАНИЕ, уникальности всех номеров и их порядок
         numToCheck = 18;
         int newSerialNumber = 12;
         nameWithOldSerialNumber = Pet.Pets[numToCheck].Name.Value;
         Pet.Pets[numToCheck].ChangeSerialNumber(newSerialNumber);
         nameWithNewSerialNumber = Pet.Pets[newSerialNumber - 1].Name.Value;
 
-        Assert.Equal(GetUniqueSerialNumbersCount(), petsCount);
-        CheckOrderAssert(petsCount);
+        Assert.Equal(GetUniqueSerialNumbersCount(), petCount);
+        CheckOrderAssert(petCount);
         Assert.Equal(nameWithOldSerialNumber, nameWithNewSerialNumber);
+
+
+        //Проверка переноса serial number НА ВОЗРАСТАНИЕ, уникальности всех номеров и их порядок
+        numToCheck = 11;
+        newSerialNumber = 20;
+        nameWithOldSerialNumber = Pet.Pets[numToCheck].Name.Value;
+        Pet.Pets[numToCheck].ChangeSerialNumber(newSerialNumber);
+        nameWithNewSerialNumber = Pet.Pets[newSerialNumber - 1].Name.Value;
+
+        Assert.Equal(GetUniqueSerialNumbersCount(), petCount);
+        CheckOrderAssert(petCount);
+        Assert.Equal(nameWithOldSerialNumber, nameWithNewSerialNumber);
+
+
     }
 
     private int GetUniqueSerialNumbersCount() => Pet.Pets.Select(x => x.SerialNumber.Value).Distinct().Count();

@@ -51,7 +51,7 @@ public class PetConfiguration : IEntityTypeConfiguration<Pet>
         builder.Property(i => i.BreedId)
             .HasConversion(
                 b => b.Value,
-                value => BreedId.Create(value))
+                value => BreedId.Create(value).Value)
             .IsRequired(false)
             .HasColumnName("breed_id");
 
@@ -67,7 +67,7 @@ public class PetConfiguration : IEntityTypeConfiguration<Pet>
         builder.Property(i => i.ShelterId)
             .HasConversion(
                 id => id.Value,
-                value => PetShelterId.Create(value))
+                value => PetShelterId.Create(value).Value)
             .IsRequired()
             .HasColumnName("shelter_id");
 
@@ -130,7 +130,7 @@ public class PetConfiguration : IEntityTypeConfiguration<Pet>
         builder.Property(i => i.VolunteerId)
             .HasConversion(
                 id => id.Value,
-                value => VolunteerId.Create(value))
+                value => VolunteerId.Create(value).Value)
             .IsRequired()
             .HasColumnName("volunteer_id");
 
@@ -152,5 +152,19 @@ public class PetConfiguration : IEntityTypeConfiguration<Pet>
                 value => SerialNumber.Create(value))
             .IsRequired()
             .HasColumnName("serial_number");
+
+      //photo details
+      builder.OwnsOne(d => d.MediaDetails, db =>
+      {
+          db.ToJson();
+          db.OwnsMany(db => db.Values, pb =>
+          {
+              pb.Property(p => p.BucketName)
+              .IsRequired();
+      
+              pb.Property(p => p.FileName)
+              .IsRequired();
+          });
+      });
     }
 }

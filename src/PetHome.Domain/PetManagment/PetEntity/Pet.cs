@@ -3,6 +3,7 @@ using PetHome.Domain.PetManagment.GeneralValueObjects;
 using PetHome.Domain.PetManagment.VolunteerEntity;
 using PetHome.Domain.Shared.Error;
 using PetHome.Domain.Shared.Interfaces;
+using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
 
 namespace PetHome.Domain.PetManagment.PetEntity;
@@ -13,7 +14,6 @@ public class Pet : SoftDeletableEntity
     private Pet() { }
 
     private Pet(
-        PetId id,
         PetName name,
         SpeciesId speciesId,
         Description description,
@@ -25,10 +25,10 @@ public class Pet : SoftDeletableEntity
         Date birthDate,
         bool isVaccinated,
         PetStatusEnum status,
-        RequisitesDetails requisitesDetails,
-        Date profileCreateDate)
+        VolunteerId volunteerId,
+        RequisitesDetails requisitesDetails)
     {
-        Id = id;
+        Id = PetId.Create();
         Name = name;
         SpeciesId = speciesId;
         Description = description;
@@ -40,7 +40,9 @@ public class Pet : SoftDeletableEntity
         IsVaccinated = isVaccinated;
         Status = status;
         RequisitesDetails = requisitesDetails;
-        ProfileCreateDate = profileCreateDate;
+        VolunteerId = volunteerId;
+        ProfileCreateDate = Date.Create(DateTime.UtcNow).Value;
+        MediaDetails = MediaDetails.Create().Value;
     }
 
 
@@ -60,9 +62,9 @@ public class Pet : SoftDeletableEntity
     public Date ProfileCreateDate { get; private set; }
     public VolunteerId VolunteerId { get; private set; }
     public SerialNumber SerialNumber { get; private set; }
+    public MediaDetails MediaDetails { get; private set; }
 
     public static Result<Pet, Error> Create(
-        PetId id,
         PetName name,
         SpeciesId speciesId,
         Description description,
@@ -74,14 +76,13 @@ public class Pet : SoftDeletableEntity
         Date birthDate,
         bool isVaccinated,
         PetStatusEnum status,
-        RequisitesDetails requisitesDetails,
-        Date profileCreateDate)
+        VolunteerId volunteerId,
+        RequisitesDetails requisitesDetails)
     {
         if (weight > 500 || weight <= 0)
             return Errors.Validation("Вес");
 
         Pet pet = new Pet(
-            id,
             name,
             speciesId,
             description,
@@ -93,8 +94,8 @@ public class Pet : SoftDeletableEntity
             birthDate,
             isVaccinated,
             status,
-            requisitesDetails,
-            profileCreateDate);
+            volunteerId,
+            requisitesDetails);
 
         pet.InitSerialNumer();
         Pets.Add(pet);
@@ -105,33 +106,85 @@ public class Pet : SoftDeletableEntity
     public override void SoftRestore() => base.SoftRestore();
 
     // Присвоить serial number = max + 1
-    public void InitSerialNumer()
+    public UnitResult<Error> InitSerialNumer()
     {
         SerialNumber serialNumber = Pets.Count == 0
             ? SerialNumber.Create(1)
             : SerialNumber.Create(Pets.Select(x => x.SerialNumber.Value).Max() + 1);
 
         SerialNumber = serialNumber;
+        return Result.Success<Error>();
     }
 
     //Изменить serial number
-    public void ChangeSerialNumber(int number)
+    public UnitResult<Error> ChangeSerialNumber(int number)
     {
+        if (Pets.Count == 0)
+        {
+            InitSerialNumer();
+            return Result.Success<Error>();
+        }
 
-        Pets.Where(p =>
-                p.SerialNumber.Value >= number
-                && p.SerialNumber.Value < SerialNumber.Value)
-            .ToList()
-            .ForEach(s => s.SerialNumber = SerialNumber.Create(s.SerialNumber.Value + 1));
+        int maxSerialNumber = Pets.Max(s => s.SerialNumber.Value);
+        if (number > maxSerialNumber || number < 1)
+        {
+            return Errors.Conflict($"Новый серийный номер {number} не можеть превышать максимальное значение {maxSerialNumber} и быть меньше 1");
+        }
+
+        if (number > SerialNumber.Value)
+        {
+            Pets.Where(p =>
+              p.SerialNumber.Value > SerialNumber.Value
+              && p.SerialNumber.Value <= number)
+          .ToList()
+         .ForEach(s => s.SerialNumber = SerialNumber.Create(s.SerialNumber.Value - 1));
+        }
+        else if (number < SerialNumber.Value)
+        {
+            Pets.Where(p =>
+               p.SerialNumber.Value < SerialNumber.Value
+               && p.SerialNumber.Value >= number)
+           .ToList()
+           .ForEach(s => s.SerialNumber = SerialNumber.Create(s.SerialNumber.Value + 1));
+        }
 
         SerialNumber = SerialNumber.Create(number);
 
         Pets = Pets.OrderBy(x => x.SerialNumber.Value).ToList();
+
+        return Result.Success<Error>();
     }
 
     // Присвоить serial number =  1
-    public void ChangeSerialNumberToBegining()
+    public UnitResult<Error> ChangeSerialNumberToBegining()
     {
-        ChangeSerialNumber(1);
+        return ChangeSerialNumber(1);
+    }
+
+    //Добавить медиа
+    public UnitResult<Error> UploadMedia(IEnumerable<Media> mediasToUpload)
+    {
+        List<Media> newMediaFiles = new List<Media>();
+        newMediaFiles.AddRange(mediasToUpload);
+
+        IReadOnlyList<Media> oldMedias = MediaDetails.Values.ToList();
+        oldMedias.ToList().ForEach(x => newMediaFiles.Add(Media.Create(x.BucketName, x.FileName).Value));
+
+        MediaDetails = MediaDetails.Create(newMediaFiles).Value;
+
+        return Result.Success<Error>();
+    }
+
+    //Удалить медиа
+    public UnitResult<Error> RemoveMedia(IEnumerable<Media> mediasToDelete)
+    {
+        List<Media> oldMediaFiles = MediaDetails.Values
+            .Select(m=>Media.Create(m.BucketName,m.FileName).Value).ToList();
+
+        List<Media> newMediaFiles = oldMediaFiles.Except(mediasToDelete).ToList();
+
+        MediaDetails = MediaDetails.Create(newMediaFiles).Value;
+
+        return Result.Success<Error>();
     }
 }
