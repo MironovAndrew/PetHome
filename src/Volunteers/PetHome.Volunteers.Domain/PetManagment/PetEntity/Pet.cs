@@ -11,13 +11,14 @@ using PetHome.Core.ValueObjects.PetManagment.Species;
 using PetHome.Core.ValueObjects.PetManagment.Volunteer;
 
 namespace PetHome.Volunteers.Domain.PetManagment.PetEntity;
-public class Pet : SoftDeletableEntity
+public class Pet : DomainEntity<PetId>, ISoftDeletableEntity
 {
     public static List<Pet> Pets { get; set; } = new List<Pet>();
 
-    private Pet() { }
+    private Pet(PetId id) : base(id) { }
 
     private Pet(
+        PetId id,
         PetName name,
         SpeciesId speciesId,
         Description description,
@@ -31,9 +32,9 @@ public class Pet : SoftDeletableEntity
         PetStatusEnum status,
         VolunteerId volunteerId,
         ValueObjectList<Requisites> requisites,
-        MediaFile avatar = null)
-    {
-        Id = PetId.Create().Value;
+        MediaFile avatar = null) : base(id)
+    { 
+        Id = id;
         Name = name;
         SpeciesId = speciesId;
         Description = description;
@@ -69,7 +70,9 @@ public class Pet : SoftDeletableEntity
     public VolunteerId VolunteerId { get; private set; }
     public SerialNumber SerialNumber { get; private set; }
     public ValueObjectList<MediaFile> Photos { get; private set; }
-    public MediaFile? Avatar { get; private set; }
+    public MediaFile? Avatar { get; private set; } 
+    public DateTime DeletionDate { get; set; }
+    public bool IsDeleted { get; set; }
 
     public static Result<Pet, Error> Create(
         PetName name,
@@ -91,6 +94,7 @@ public class Pet : SoftDeletableEntity
             return Errors.Validation("Вес");
 
         Pet pet = new Pet(
+            PetId.Create().Value,
             name,
             speciesId,
             description,
@@ -110,9 +114,18 @@ public class Pet : SoftDeletableEntity
         Pets.Add(pet);
         return pet;
     }
+     
+    public void SoftDelete()
+    {
+        DeletionDate = DateTime.UtcNow;
+        IsDeleted = true;
+    }
 
-    public override void SoftDelete() => base.SoftDelete();
-    public override void SoftRestore() => base.SoftRestore();
+    public void SoftRestore()
+    {
+        DeletionDate = default;
+        IsDeleted = false;
+    }
 
     // Присвоить serial number = max + 1
     public UnitResult<Error> InitSerialNumber()
@@ -171,11 +184,11 @@ public class Pet : SoftDeletableEntity
     //Добавить медиа
     public UnitResult<Error> UploadMedia(IEnumerable<MediaFile> mediasToUpload)
     {
-        List<MediaFile> newMediaFiles = new List<MediaFile>(mediasToUpload); 
+        List<MediaFile> newMediaFiles = new List<MediaFile>(mediasToUpload);
 
         IReadOnlyList<MediaFile> oldMedias = Photos.Values.ToList();
         oldMedias.ToList().ForEach(x => newMediaFiles.Add(MediaFile.Create(x.BucketName, x.FileName).Value));
-         
+
         Photos = newMediaFiles;
 
         return Result.Success<Error>();
@@ -188,7 +201,7 @@ public class Pet : SoftDeletableEntity
             .Select(m => MediaFile.Create(m.BucketName, m.FileName).Value).ToList();
 
         List<MediaFile> newMediaFiles = oldMediaFiles.Except(mediasToDelete).ToList();
-         
+
         Photos = newMediaFiles;
 
         return Result.Success<Error>();
